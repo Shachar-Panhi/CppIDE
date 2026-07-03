@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "clang-preset",
+      "generator": "Ninja",
+      "toolset": "ClangCl",
+      "binaryDir": "${sourceDir}/out/build/${presetName}"
+    }
+  ]
+}
