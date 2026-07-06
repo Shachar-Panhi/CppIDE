@@ -1,0 +1,41 @@
+  CompileFlags:
+    Add:
+      - -Wall
+      - -Wextra
+      - -Wpedantic
+      - -Wconversion
+      - -Wshadow
+      - -Wnon-virtual-dtor
+      - -Wold-style-cast
+      - -Woverloaded-virtual
+      - -Wnull-dereference
+      - -std=c++23
+
+Diagnostics:
+  ClangTidy:
+    Add:
+      - clang-analyzer-*
+      - bugprone-*
+      - modernize-*
+      - performance-*
+      - readability-*
+      - readability-identifier-naming
+      - cppcoreguidelines-*
+      - google-*
+      - misc-*
+
+    Remove:
+      - modernize-use-trailing-return-type
+
+    CheckOptions:
+      readability-identifier-naming.ClassCase: CamelCase
+      readability-identifier-naming.StructCase: CamelCase
+      readability-identifier-naming.EnumCase: CamelCase
+      readability-identifier-naming.FunctionCase: lower_case
+      readability-identifier-naming.VariableCase: lower_case
+      readability-identifier-naming.ParameterCase: lower_case
+      readability-identifier-naming.MemberCase: lower_case
+      readability-identifier-naming.MemberSuffix: _
+      readability-identifier-naming.NamespaceCase: CamelCase
+      readability-identifier-naming.ConstantCase: CamelCase
+      readability-identifier-naming.ConstantPrefix: k

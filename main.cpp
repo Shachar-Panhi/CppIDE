@@ -1,6 +1,5 @@
-#include <iostream>
+#include <print>
 
-int main()
-{
-    std::cout << "Hello World!\n";
+int main() {
+    std::print("Hello World!\n");
 }
