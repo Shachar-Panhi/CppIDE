@@ -14,10 +14,10 @@ int main() {
     tcp::resolver resolver(io_context);
     tcp::socket socket(io_context);
 
-    while (true) {
-        if (!connect_client(resolver, socket, ec))
-            return 1;
+    if (!connect_client(resolver, socket, ec))
+        return 1;
 
+    while (true) {
         if (!send_message(socket, ec))
             return 1;
 
@@ -28,7 +28,7 @@ int main() {
     return 0;
 }
 
- bool connect_client(tcp::resolver& resolver, tcp::socket& socket, boost::system::error_code& ec) {
+bool connect_client(tcp::resolver& resolver, tcp::socket& socket, boost::system::error_code& ec) {
     auto endpoints = resolver.resolve("127.0.0.1", "8080", ec);
 
     if (ec) {
@@ -45,34 +45,34 @@ int main() {
 
     std::print("Successfully connected!\n");
     return true;
- }
+}
 
- bool send_message(tcp::socket& socket, boost::system::error_code& ec) {
-     std::print("Please enter a message: \n");
-     std::string user_input;
-     std::getline(std::cin, user_input);
+bool send_message(tcp::socket& socket, boost::system::error_code& ec) {
+    std::print("Please enter a message: \n");
+    std::string user_input;
+    std::getline(std::cin, user_input);
 
-     boost::asio::write(socket, boost::asio::buffer(user_input), ec);
-     if (ec) {
-         std::print("Send failed: {}\n", ec.message());
-         return false;
-     }
+    boost::asio::write(socket, boost::asio::buffer(user_input), ec);
+    if (ec) {
+        std::print("Send failed: {}\n", ec.message());
+        return false;
+    }
 
-     std::print("\nSent: {}\n", user_input);
-     return true;
- }
+    std::print("\nSent: {}\n", user_input);
+    return true;
+}
 
- bool receive_print_reply(tcp::socket& socket, boost::system::error_code& ec) {
-     char reply[1024];
+bool receive_print_reply(tcp::socket& socket, boost::system::error_code& ec) {
+    char reply[1024];
 
-     size_t reply_length = socket.read_some(boost::asio::buffer(reply), ec);
+    size_t reply_length = socket.read_some(boost::asio::buffer(reply), ec);
 
-     if (ec) {
-         std::print("Receive failed: {}\n", ec.message());
-         return false;
-     }
+    if (ec) {
+        std::print("Receive failed: {}\n", ec.message());
+        return false;
+    }
 
-     std::string_view received_message(reply, reply_length);
-     std::print("Received back: {}\n\n", received_message);
-     return true;
- }
+    std::string_view received_message(reply, reply_length);
+    std::print("Received back: {}\n\n", received_message);
+    return true;
+}
