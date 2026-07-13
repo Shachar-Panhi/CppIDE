@@ -14,14 +14,16 @@ int main() {
     tcp::resolver resolver(io_context);
     tcp::socket socket(io_context);
 
-    if (!connect_client(resolver, socket, ec))
-        return 1;
-   
-    if (!send_message(socket, ec))
-        return 1;
+    while (true) {
+        if (!connect_client(resolver, socket, ec))
+            return 1;
 
-    if (!receive_print_reply(socket, ec))
-        return 1;
+        if (!send_message(socket, ec))
+            return 1;
+
+        if (!receive_print_reply(socket, ec))
+            return 1;
+    }
 
     return 0;
 }
@@ -56,7 +58,7 @@ int main() {
          return false;
      }
 
-     std::print("Sent: {}\n", user_input);
+     std::print("\nSent: {}\n", user_input);
      return true;
  }
 
@@ -71,6 +73,6 @@ int main() {
      }
 
      std::string_view received_message(reply, reply_length);
-     std::print("Received back: {}\n", received_message);
+     std::print("Received back: {}\n\n", received_message);
      return true;
  }
