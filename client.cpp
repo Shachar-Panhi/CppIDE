@@ -5,8 +5,9 @@
 using boost::asio::ip::tcp;
 
 bool connect_client(tcp::resolver&, tcp::socket&, boost::system::error_code&);
-bool send_message(tcp::socket&, boost::system::error_code&);
-bool receive_print_reply(tcp::socket&, boost::system::error_code&);
+boost::asio::awaitable<void> async_connection(tcp::socket&, boost::system::error_code&);
+boost::asio::awaitable<void> send_message(tcp::socket&, boost::system::error_code&);
+boost::asio::awaitable<void> receive_print_reply(tcp::socket&, boost::system::error_code&);
 
 int main() {
     boost::asio::io_context io_context;
@@ -17,14 +18,9 @@ int main() {
     if (!connect_client(resolver, socket, ec))
         return 1;
 
-    while (true) {
-        if (!send_message(socket, ec))
-            return 1;
+    boost::asio::co_spawn(io_context, async_connection(socket, ec), boost::asio::detached);
 
-        if (!receive_print_reply(socket, ec))
-            return 1;
-    }
-
+    io_context.run();
     return 0;
 }
 
@@ -47,32 +43,38 @@ bool connect_client(tcp::resolver& resolver, tcp::socket& socket, boost::system:
     return true;
 }
 
-bool send_message(tcp::socket& socket, boost::system::error_code& ec) {
+boost::asio::awaitable<void> async_connection(tcp::socket& socket, boost::system::error_code& ec) {
+    while (true) {
+        co_await send_message(socket, ec);
+
+        if (!ec)
+            co_await receive_print_reply(socket, ec);
+    }
+}
+
+boost::asio::awaitable<void> send_message(tcp::socket& socket, boost::system::error_code& ec) {
     std::print("Please enter a message: \n");
     std::string user_input;
     std::getline(std::cin, user_input);
 
-    boost::asio::write(socket, boost::asio::buffer(user_input), ec);
-    if (ec) {
+    co_await boost::asio::async_write(socket, boost::asio::buffer(user_input), boost::asio::redirect_error(boost::asio::use_awaitable, ec));
+    
+    if (ec) 
         std::print("Send failed: {}\n", ec.message());
-        return false;
-    }
-
-    std::print("\nSent: {}\n", user_input);
-    return true;
+    else
+        std::print("\nSent: {}\n", user_input);
 }
 
-bool receive_print_reply(tcp::socket& socket, boost::system::error_code& ec) {
+boost::asio::awaitable<void> receive_print_reply(tcp::socket& socket,
+                                                 boost::system::error_code& ec) {
     char reply[1024];
 
-    size_t reply_length = socket.read_some(boost::asio::buffer(reply), ec);
+    size_t reply_length = co_await socket.async_read_some(boost::asio::buffer(reply),boost::asio::redirect_error(boost::asio::use_awaitable, ec));
 
-    if (ec) {
+    if (ec) 
         std::print("Receive failed: {}\n", ec.message());
-        return false;
+    else {
+        std::string_view received_message(reply, reply_length);
+        std::print("Received back: {}\n\n", received_message);
     }
-
-    std::string_view received_message(reply, reply_length);
-    std::print("Received back: {}\n\n", received_message);
-    return true;
 }

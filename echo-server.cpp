@@ -6,12 +6,13 @@ using boost::asio::ip::tcp;
 
 bool server_listen(tcp::acceptor&, tcp::endpoint&, boost::system::error_code&);
 
-boost::asio::awaitable<void> async_connection(tcp::acceptor&,
-                                              boost::asio::io_context&, boost::system::error_code&);
+boost::asio::awaitable<void> async_connection(tcp::acceptor&, boost::asio::io_context&,
+                                              boost::system::error_code&);
 
-boost::asio::awaitable<void> establish_connection(tcp::acceptor&, tcp::socket&, boost::system::error_code&);
+boost::asio::awaitable<void> establish_connection(tcp::acceptor&, tcp::socket&,
+                                                  boost::system::error_code&);
 
-boost::asio::awaitable<void> read_return_data(tcp::socket&, boost::system::error_code&);
+boost::asio::awaitable<void> read_return_data(tcp::socket, boost::system::error_code&);
 
 int main() {
     boost::asio::io_context io_context;
@@ -22,7 +23,8 @@ int main() {
     if (ec || !server_listen(acceptor, endpoint, ec))
         return 1;
 
-    boost::asio::co_spawn(io_context, async_connection(acceptor, io_context, ec), boost::asio::detached);
+    boost::asio::co_spawn(io_context, async_connection(acceptor, io_context, ec),
+                          boost::asio::detached);
 
     io_context.run();
     return 0;
@@ -43,8 +45,8 @@ bool server_listen(tcp::acceptor& acceptor, tcp::endpoint& endpoint,
     return true;
 }
 
-boost::asio::awaitable<void> async_connection(
-    tcp::acceptor& acceptor, boost::asio::io_context& io_context,
+boost::asio::awaitable<void> async_connection(tcp::acceptor& acceptor,
+                                              boost::asio::io_context& io_context,
                                               boost::system::error_code& ec) {
     while (true) {
         tcp::socket socket(io_context);
@@ -52,7 +54,8 @@ boost::asio::awaitable<void> async_connection(
         co_await establish_connection(acceptor, socket, ec);
 
         if (!ec) {
-            co_await read_return_data(socket, ec);
+            boost::asio::co_spawn(io_context, read_return_data(std::move(socket), ec),
+                                  boost::asio::detached);
         }
     }
 }
@@ -69,7 +72,7 @@ boost::asio::awaitable<void> establish_connection(tcp::acceptor& acceptor, tcp::
     }
 }
 
-boost::asio::awaitable<void> read_return_data(tcp::socket& socket, boost::system::error_code& ec) {
+boost::asio::awaitable<void> read_return_data(tcp::socket socket, boost::system::error_code& ec) {
     char data[1024];
     while (true) {
         size_t length = co_await socket.async_read_some(
