@@ -14,7 +14,6 @@
     {
       "name": "clang-debug",
       "inherits": "base",
-      "toolset": "ClangCl",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
@@ -23,7 +22,6 @@
     {
       "name": "clang-release",
       "inherits": "base",
-      "toolset": "ClangCl",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
@@ -34,6 +32,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++"
       }
     },
@@ -42,6 +41,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++"
       }
     }

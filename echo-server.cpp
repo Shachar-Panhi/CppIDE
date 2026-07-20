@@ -1,93 +1,104 @@
-#include <boost/asio.hpp>
-#include <iostream>
+#include "echo-server.hpp"
+#include "boost/asio/error.hpp"
 #include <print>
+#include <array>
 
-using boost::asio::ip::tcp;
+namespace ServerNamespace {
+    std::expected<tcp::acceptor, boost::system::error_code> server_listen(boost::asio::io_context& io_context) {
+        boost::system::error_code ec;
 
-bool server_listen(tcp::acceptor&, tcp::endpoint&, boost::system::error_code&);
+        tcp::acceptor acceptor(io_context);
 
-boost::asio::awaitable<void> async_connection(tcp::acceptor&, boost::asio::io_context&,
-                                              boost::system::error_code&);
+        tcp::endpoint endpoint(boost::asio::ip::make_address("127.0.0.1", ec), 8080);
+        if (ec){
+            std::println("invalid ip address {}", ec.message());
+            return std::unexpected(ec);
+        }
 
-boost::asio::awaitable<void> establish_connection(tcp::acceptor&, tcp::socket&,
-                                                  boost::system::error_code&);
+        acceptor.open(endpoint.protocol(), ec);
+        acceptor.bind(endpoint, ec);
+        acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
 
-boost::asio::awaitable<void> read_return_data(tcp::socket, boost::system::error_code&);
+        if (ec) {
+            std::print("Failed to start server: {}", ec.message());
+            return std::unexpected(ec);
+        }
+
+        std::print("Server is listening on port 8080\n");
+        return acceptor;
+    }
+
+    boost::asio::awaitable<void> async_connection(tcp::acceptor acceptor) {
+        auto context_engine = co_await boost::asio::this_coro::executor;
+
+        while (true) {
+            auto result = co_await establish_connection(&acceptor);
+
+            if (result.has_value()) {
+                boost::asio::co_spawn(context_engine, read_return_data(std::move(result.value())),
+                                    boost::asio::detached);
+            }
+        }
+    }
+
+    boost::asio::awaitable<std::expected<tcp::socket, boost::system::error_code>> establish_connection(tcp::acceptor* acceptor) {
+        boost::system::error_code ec;
+        
+        tcp::socket socket = co_await acceptor->async_accept(boost::asio::redirect_error(boost::asio::use_awaitable, ec));
+
+        if (ec) {
+            std::print("\nConnection failed: {}\n", ec.message());
+            co_return std::unexpected(ec);
+        }
+        std::print("\nClient successfully connected!\n");
+
+        co_return socket;
+    }
+
+    boost::asio::awaitable<void> read_return_data(tcp::socket socket) {
+        boost::system::error_code ec;
+        
+        std::array<uint8_t, 1024> data{};
+        while (true) {
+            size_t length = co_await socket.async_read_some(
+                boost::asio::buffer(data), boost::asio::redirect_error(boost::asio::use_awaitable, ec));
+
+            if (ec == boost::asio::error::eof) {
+                std::println("Client disconnected without an error\n");
+                break; 
+            }
+
+            if (ec == boost::asio::error::operation_aborted) {
+                std::println("Operation aborted\n");
+                break;
+            }
+            
+            if (ec) {
+                std::println("Data error: {}\n", ec.message());
+                break;
+            }
+
+            co_await boost::asio::async_write(
+                socket, boost::asio::buffer(data, length),
+                boost::asio::redirect_error(boost::asio::use_awaitable, ec));
+        }
+    }
+}
+
+
 
 int main() {
     boost::asio::io_context io_context;
-    boost::system::error_code ec;
-    tcp::acceptor acceptor(io_context);
-    tcp::endpoint endpoint(boost::asio::ip::make_address("127.0.0.1", ec), 8080);
-
-    if (ec || !server_listen(acceptor, endpoint, ec))
+    
+    auto result = ServerNamespace::server_listen(io_context);
+    if (!result.has_value()) {
+        std::println("Connection error occurred");
         return 1;
+    }
 
-    boost::asio::co_spawn(io_context, async_connection(acceptor, io_context, ec),
+    boost::asio::co_spawn(io_context, ServerNamespace::async_connection(std::move(result.value())),
                           boost::asio::detached);
 
     io_context.run();
     return 0;
-}
-
-bool server_listen(tcp::acceptor& acceptor, tcp::endpoint& endpoint,
-                   boost::system::error_code& ec) {
-    acceptor.open(endpoint.protocol(), ec);
-    acceptor.bind(endpoint, ec);
-    acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
-
-    if (ec) {
-        std::print("Failed to start server: {}", ec.message());
-        return false;
-    }
-
-    std::print("Server is listening on port 8080\n");
-    return true;
-}
-
-boost::asio::awaitable<void> async_connection(tcp::acceptor& acceptor,
-                                              boost::asio::io_context& io_context,
-                                              boost::system::error_code& ec) {
-    while (true) {
-        tcp::socket socket(io_context);
-
-        co_await establish_connection(acceptor, socket, ec);
-
-        if (!ec) {
-            boost::asio::co_spawn(io_context, read_return_data(std::move(socket), ec),
-                                  boost::asio::detached);
-        }
-    }
-}
-
-boost::asio::awaitable<void> establish_connection(tcp::acceptor& acceptor, tcp::socket& socket,
-                                                  boost::system::error_code& ec) {
-    co_await acceptor.async_accept(socket,
-                                   boost::asio::redirect_error(boost::asio::use_awaitable, ec));
-
-    if (ec) {
-        std::print("\nConnection failed: {}\n", ec.message());
-    } else {
-        std::print("\nClient successfully connected!\n");
-    }
-}
-
-boost::asio::awaitable<void> read_return_data(tcp::socket socket, boost::system::error_code& ec) {
-    char data[1024];
-    while (true) {
-        size_t length = co_await socket.async_read_some(
-            boost::asio::buffer(data), boost::asio::redirect_error(boost::asio::use_awaitable, ec));
-
-        if (ec == boost::asio::error::eof) {
-            std::print("Client disconnected without an error\n\n");
-            break;
-        } else if (ec) {
-            std::print("Data error: {}\n\n", ec.message());
-            break;
-        }
-
-        co_await boost::asio::async_write(
-            socket, boost::asio::buffer(data, length),
-            boost::asio::redirect_error(boost::asio::use_awaitable, ec));
-    }
 }
